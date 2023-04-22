@@ -4,6 +4,12 @@ models/lama.ckpt
 models/model_scope_diffusers/
 text-to-video-ms-1.7b/
 
+# Vim placeholders
+*.swp
+
+# Ctags cache
+tags
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

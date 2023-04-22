@@ -361,7 +361,8 @@ def is_mixed_precision(accelerator):
 
 def cast_to_gpu_and_type(model_list, accelerator, weight_dtype):
     for model in model_list:
-        if model is not None: model.to(accelerator.device, dtype=weight_dtype)
+        if model is not None:
+            model.to(accelerator.device, dtype=weight_dtype)
 
 def handle_cache_latents(
         should_cache, 
@@ -600,7 +601,7 @@ def main(
 
     # Freeze any necessary models
     freeze_models([vae, text_encoder, unet])
-    
+
     # Enable xformers if available
     handle_memory_attention(enable_xformers_memory_efficient_attention, enable_torch_2_attn, unet)
 
