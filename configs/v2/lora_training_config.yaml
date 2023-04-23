@@ -3,6 +3,7 @@ pretrained_model_path: "./models/models_scope_diffusers/" #https://huggingface.c
 
 # The folder where your training outputs will be placed.
 output_dir: "./outputs"
+latent_cache: "./outputs/latent_cache"
 
 # You can train multiple datasets at once. They will be joined together for training.
 # Simply remove the line you don't need, or keep them all for mixed training.
@@ -151,7 +152,7 @@ extra_text_encoder_params: null
   #adam_weight_decay: 0.2
 
 # How many batches to train. Not to be confused with video frames.
-train_batch_size: 1
+train_batch_size: 16
 
 # Maximum number of train steps. Model is saved after training.
 max_train_steps: 10000

@@ -1,4 +1,5 @@
 from glob import glob
+from pathlib import Path
 from itertools import islice
 import json
 import os
@@ -685,12 +686,14 @@ class VideoFolderDataset(Dataset):
 
 
 class CachedDataset(Dataset):
-    def __init__(self,cache_dir: str = ''):
+    def __init__(self, cache_dir: str = ''):
         self.cache_dir = cache_dir
         self.cached_data_list = self.get_files_list()
 
     def get_files_list(self):
-        tensors_list = [f"{self.cache_dir}/{x}" for x in os.listdir(self.cache_dir) if x.endswith('.pt')]
+        tensors_list = [
+            Path(x) for x in os.scandir(self.cache_dir) if x.name.endswith('.pt')
+        ]
         return sorted(tensors_list)
 
     def __len__(self):

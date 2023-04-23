@@ -68,6 +68,7 @@ check_min_version("0.10.0.dev0")
 
 logger = get_logger(__name__, log_level="INFO")
 
+
 def create_logging(logging, logger, accelerator):
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -75,6 +76,7 @@ def create_logging(logging, logger, accelerator):
         level=logging.INFO,
     )
     logger.info(accelerator.state, main_process_only=False)
+
 
 def accelerate_set_verbose(accelerator):
     if accelerator.is_local_main_process:
@@ -100,13 +102,13 @@ def get_train_dataset(dataset_types, train_data, tokenizer):
 
 
 def extend_datasets(datasets, dataset_items, extend=False):
-    biggest_data_len = max(x.__len__() for x in datasets)
+    biggest_data_len = max(len(x) for x in datasets)
     extended = []
     for dataset in datasets:
-        if dataset.__len__() == 0:
+        if len(dataset) == 0:
             del dataset
             continue
-        if dataset.__len__() < biggest_data_len:
+        if len(dataset) < biggest_data_len:
             for item in dataset_items:
                 if extend and item not in extended and hasattr(dataset, item):
                     print(f"Extending {item}")
@@ -117,7 +119,7 @@ def extend_datasets(datasets, dataset_items, extend=False):
 
                     setattr(dataset, item, value)
 
-                    print(f"New {item} dataset length: {dataset.__len__()}")
+                    print(f"New {item} dataset length: {len(dataset)}")
                     extended.append(item)
 
 
@@ -259,24 +261,26 @@ def inject_lora(use_lora, model, replace_modules, is_extended=False, dropout=0.0
                 print(f"Lora successfully injected into {model.__class__.__name__}.")
 
             break
-        
+
     return params, negation
 
-def save_lora(model, name, condition, replace_modules, step, save_path): 
+
+def save_lora(model, name, condition, replace_modules, step, save_path):
     if condition and replace_modules is not None:
         save_path = f"{save_path}/{step}_{name}.pt"
         save_lora_weight(model, save_path, replace_modules)
 
+
 def handle_lora_save(
-    use_unet_lora, 
-    use_text_lora, 
-    model, 
-    save_path, 
-    checkpoint_step, 
-    unet_target_modules, 
+    use_unet_lora,
+    use_text_lora,
+    model,
+    save_path,
+    checkpoint_step,
+    unet_target_modules,
     text_encoder_target_modules
 ):
-    
+
     save_path = f"{save_path}/lora"
     os.makedirs(save_path, exist_ok=True)
 
@@ -382,44 +386,55 @@ def is_mixed_precision(accelerator):
 
     return weight_dtype
 
+
 def cast_to_gpu_and_type(model_list, accelerator, weight_dtype):
     for model in model_list:
         if model is not None:
             model.to(accelerator.device, dtype=weight_dtype)
 
-def handle_cache_latents(
-        should_cache, 
-        output_dir, 
-        train_dataloader, 
-        train_batch_size, 
-        vae, 
-        cached_latent_dir=None
-    ):
 
-    # Cache latents by storing them in VRAM. 
+def handle_cache_latents(
+    accelerator,
+    should_cache,
+    output_dir,
+    train_dataloader,
+    train_batch_size,
+    vae,
+    cached_latent_dir=None
+):
+
+    # Cache latents by storing them in VRAM.
     # Speeds up training and saves memory by not encoding during the train loop.
-    if not should_cache: return None
+    if not should_cache:
+        return None
     vae.to('cuda', dtype=torch.float16)
     vae.enable_slicing()
-    
+
     cached_latent_dir = (
-        os.path.abspath(cached_latent_dir) if cached_latent_dir is not None else None 
-        )
+        os.path.abspath(cached_latent_dir) if cached_latent_dir is not None else None
+    )
+
+    # Distributed case: write each rank's output to different path, since indices alone will clash
+    rank = accelerator.process_index
 
     if cached_latent_dir is None:
-        cache_save_dir = f"{output_dir}/cached_latents"
-        os.makedirs(cache_save_dir, exist_ok=True)
+        cache_save_dir = Path(output_dir) / 'cached_latents'
+        cache_save_dir.mkdir(exist_ok=True)
 
         for i, batch in enumerate(tqdm(train_dataloader, desc="Caching Latents.")):
 
-            save_name = f"cached_{i}"
-            full_out_path =  f"{cache_save_dir}/{save_name}.pt"
+            full_out_path = cache_save_dir / f'cached_{rank}.{i}.pt'
+            if full_out_path.is_file():
+                print(f"Skipping cached example in {str(full_out_path)}")
+                continue
 
             pixel_values = batch['pixel_values'].to('cuda', dtype=torch.float16)
             batch['pixel_values'] = tensor_to_vae_latent(pixel_values, vae)
-            for k, v in batch.items(): batch[k] = v[0]
-        
+            for k, v in batch.items():
+                batch[k] = v[0]
+
             torch.save(batch, full_out_path)
+            print(f"Cached item in {str(full_out_path)}")
             del pixel_values
             del batch
 
@@ -427,14 +442,17 @@ def handle_cache_latents(
             torch.cuda.empty_cache()
     else:
         cache_save_dir = cached_latent_dir
-        
+
+    # CachedDataset reads all files from disk so need this barrier to make sure everyone's done
+    accelerator.wait_for_everyone()
 
     return torch.utils.data.DataLoader(
-        CachedDataset(cache_dir=cache_save_dir), 
-        batch_size=train_batch_size, 
+        CachedDataset(cache_dir=cache_save_dir),
+        batch_size=train_batch_size,
         shuffle=True,
         num_workers=0
-    ) 
+    )
+
 
 def handle_trainable_modules(model, trainable_modules=None, is_enabled=True, negation=None):
     global already_printed_trainables
@@ -446,17 +464,19 @@ def handle_trainable_modules(model, trainable_modules=None, is_enabled=True, neg
             for tm in tuple(trainable_modules):
                 if tm == 'all':
                     model.requires_grad_(is_enabled)
-                    unfrozen_params =len(list(model.parameters()))
+                    unfrozen_params = len(list(model.parameters()))
                     break
-                    
+
                 if tm in name and 'lora' not in name:
                     for m in module.parameters():
                         m.requires_grad_(is_enabled)
-                        if is_enabled: unfrozen_params +=1
+                        if is_enabled:
+                            unfrozen_params += 1
 
     if unfrozen_params > 0 and not already_printed_trainables:
-        already_printed_trainables = True 
+        already_printed_trainables = True
         print(f"{unfrozen_params} params have been unfrozen for training.")
+
 
 def tensor_to_vae_latent(t, vae):
     video_length = t.shape[1]
@@ -468,8 +488,9 @@ def tensor_to_vae_latent(t, vae):
 
     return latents
 
+
 def sample_noise(latents, noise_strength, use_offset_noise):
-    b ,c, f, *_ = latents.shape
+    b, c, f, *_ = latents.shape
     noise_latents = torch.randn_like(latents, device=latents.device)
     offset_noise = None
 
@@ -479,24 +500,28 @@ def sample_noise(latents, noise_strength, use_offset_noise):
 
     return noise_latents
 
+
 def should_sample(global_step, validation_steps, validation_data):
-    return (global_step % validation_steps == 0 or global_step == 1)  \
-    and validation_data.sample_preview
+    return (
+        (global_step % validation_steps == 0 or global_step == 1)
+        and validation_data.sample_preview
+    )
+
 
 def save_pipe(
-        path, 
-        global_step,
-        accelerator, 
-        unet, 
-        text_encoder, 
-        vae, 
-        output_dir,
-        use_unet_lora,
-        use_text_lora,
-        unet_target_replace_module=None,
-        text_target_replace_module=None,
-        is_checkpoint=False,
-    ):
+    path,
+    global_step,
+    accelerator,
+    unet,
+    text_encoder,
+    vae,
+    output_dir,
+    use_unet_lora,
+    use_text_lora,
+    unet_target_replace_module=None,
+    text_target_replace_module=None,
+    is_checkpoint=False,
+):
 
     if is_checkpoint:
         save_path = os.path.join(output_dir, f"checkpoint-{global_step}")
@@ -505,9 +530,9 @@ def save_pipe(
         save_path = output_dir
 
     # Save the dtypes so we can continue training at the same precision.
-    u_dtype, t_dtype, v_dtype = unet.dtype, text_encoder.dtype, vae.dtype 
+    u_dtype, t_dtype, v_dtype = unet.dtype, text_encoder.dtype, vae.dtype
 
-   # Copy the model without creating a reference to it. This allows keeping the state of our lora training if enabled.
+    # Copy the model without creating a reference to it. This allows keeping the state of our lora training if enabled.
     unet_out = copy.deepcopy(accelerator.unwrap_model(unet, keep_fp32_wrapper=False))
     text_encoder_out = copy.deepcopy(accelerator.unwrap_model(text_encoder, keep_fp32_wrapper=False))
 
@@ -517,26 +542,26 @@ def save_pipe(
         text_encoder=text_encoder_out,
         vae=vae,
     ).to(torch_dtype=torch.float16)
-    
+
     handle_lora_save(
-        use_unet_lora, 
-        use_text_lora, 
-        pipeline, 
-        output_dir, 
+        use_unet_lora,
+        use_text_lora,
+        pipeline,
+        output_dir,
         global_step,
-        unet_target_replace_module, 
+        unet_target_replace_module,
         text_target_replace_module
     )
 
     pipeline.save_pretrained(save_path)
-    
+
     if is_checkpoint:
         unet, text_encoder = accelerator.prepare(unet, text_encoder)
         models_to_cast_back = [(unet, u_dtype), (text_encoder, t_dtype), (vae, v_dtype)]
         [x[0].to(accelerator.device, dtype=x[1]) for x in models_to_cast_back]
 
     logger.info(f"Saved model at {save_path} on step {global_step}")
-    
+
     del pipeline
     del unet_out
     del text_encoder_out
@@ -552,6 +577,7 @@ def replace_prompt(prompt, token, wlist):
 def main(
     pretrained_model_path: str,
     output_dir: str,
+    latent_cache: str,
     train_data: Dict,
     validation_data: Dict,
     dataset_types: Tuple[str] = ('ledger'),
@@ -601,7 +627,7 @@ def main(
     accelerator = Accelerator(
         gradient_accumulation_steps=gradient_accumulation_steps,
         mixed_precision=mixed_precision,
-        log_with="tensorboard",
+        log_with='wandb',
         logging_dir=output_dir
     )
 
@@ -650,9 +676,12 @@ def main(
     # Create parameters to optimize over with a condition (if "condition" is true, optimize it)
     optim_params = [
         param_optim(unet, trainable_modules is not None, extra_params=extra_unet_params, negation=unet_negation),
-        param_optim(text_encoder, train_text_encoder and not use_text_lora, extra_params=extra_text_encoder_params, 
-                    negation=text_encoder_negation
-                   ),
+        param_optim(
+            text_encoder,
+            train_text_encoder and not use_text_lora,
+            extra_params=extra_text_encoder_params,
+            negation=text_encoder_negation
+        ),
         param_optim(text_encoder_lora_params, use_text_lora, is_lora=True, extra_params={"lr": 1e-5}),
         param_optim(unet_lora_params, use_unet_lora, is_lora=True, extra_params={"lr": 1e-5})
     ]
@@ -700,8 +729,9 @@ def main(
 
     # Latents caching
     cached_data_loader = handle_cache_latents(
+        accelerator,
         cache_latents,
-        output_dir,
+        latent_cache,
         train_dataloader,
         train_batch_size,
         vae,
@@ -748,7 +778,7 @@ def main(
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
-        accelerator.init_trackers("text2video-fine-tune")
+        accelerator.init_trackers('EchoGen', config=config)
 
     # Train!
     total_batch_size = train_batch_size * accelerator.num_processes * gradient_accumulation_steps
@@ -774,7 +804,6 @@ def main(
 
         # Unfreeze UNET Layers
         if global_step == 0:
-            already_printed_trainables = False
             unet.train()
             handle_trainable_modules(
                 unet,
