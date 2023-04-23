@@ -1,54 +1,55 @@
 import argparse
+import copy
 import datetime
-import logging
+import gc
 import inspect
+import logging
 import math
 import os
 import random
-import gc
-import copy
-
 from typing import Dict, Optional, Tuple
-from omegaconf import OmegaConf
-
-import cv2
-import torch
-import torch.nn.functional as F
-import torch.utils.checkpoint
-import torchvision.transforms as T
-import diffusers
-import transformers
-
-from torchvision import transforms
-from tqdm.auto import tqdm
 
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import set_seed
-
-from models.unet_3d_condition import UNet3DConditionModel
+import cv2
+import diffusers
+from diffusers import DDPMScheduler, DPMSolverMultistepScheduler, TextToVideoSDPipeline
 from diffusers.models import AutoencoderKL
-from diffusers import DPMSolverMultistepScheduler, DDPMScheduler, TextToVideoSDPipeline
+from diffusers.models.attention import BasicTransformerBlock
+from diffusers.models.attention_processor import Attention, AttnProcessor2_0
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version, export_to_video
 from diffusers.utils.import_utils import is_xformers_available
-from diffusers.models.attention_processor import AttnProcessor2_0, Attention
-from diffusers.models.attention import BasicTransformerBlock
-
+from einops import rearrange, repeat
+from omegaconf import OmegaConf
+import torch
+import torch.nn.functional as F
+import torch.utils.checkpoint
+from torchvision import transforms
+import torchvision.transforms as T
+from tqdm.auto import tqdm
+import transformers
 from transformers import CLIPTextModel, CLIPTokenizer
 from transformers.models.clip.modeling_clip import CLIPEncoder
-from utils.dataset import VideoJsonDataset, SingleVideoDataset, \
-    ImageDataset, VideoFolderDataset, CachedDataset, VideoLedgerDataset
-from einops import rearrange, repeat
 
+from models.unet_3d_condition import UNet3DConditionModel
+from utils.dataset import (
+    CachedDataset,
+    ImageDataset,
+    SingleVideoDataset,
+    VideoFolderDataset,
+    VideoJsonDataset,
+    VideoLedgerDataset,
+)
 from utils.lora import (
     extract_lora_ups_down,
     inject_trainable_lora,
     inject_trainable_lora_extended,
+    monkeypatch_or_replace_lora,
+    monkeypatch_or_replace_lora_extended,
     save_lora_weight,
     train_patch_pipe,
-    monkeypatch_or_replace_lora,
-    monkeypatch_or_replace_lora_extended
 )
 
 DATASET_TYPE_TO_CLS = {

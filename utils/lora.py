@@ -1,11 +1,11 @@
+from itertools import groupby
 import json
 import math
-from itertools import groupby
 import os
 from typing import Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
-import numpy as np
 import PIL
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -483,8 +483,8 @@ def inject_inferable_lora(
         is_extended=False, 
         r=16
     ):    
-    from transformers.models.clip import CLIPTextModel
     from diffusers import UNet3DConditionModel
+    from transformers.models.clip import CLIPTextModel
 
     def is_text_model(f): return 'text_encoder' in f and isinstance(model.text_encoder, CLIPTextModel)
     def is_unet(f): return 'unet' in f and model.unet.__class__.__name__ == "UNet3DConditionModel"

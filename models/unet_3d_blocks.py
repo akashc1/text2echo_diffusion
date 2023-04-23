@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
-import torch.utils.checkpoint as checkpoint
-from torch import nn
 from diffusers.models.resnet import Downsample2D, ResnetBlock2D, TemporalConvLayer, Upsample2D
 from diffusers.models.transformer_2d import Transformer2DModel
 from diffusers.models.transformer_temporal import TransformerTemporalModel
+import torch
+from torch import nn
+import torch.utils.checkpoint as checkpoint
 
 # Assign gradient checkpoint function to simple variable for readability.
 g_c = checkpoint.checkpoint

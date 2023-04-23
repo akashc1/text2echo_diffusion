@@ -1,7 +1,7 @@
 outputs/
 models/lama.ckpt
 .vscode/
-models/model_scope_diffusers/
+models/models_scope_diffusers/
 text-to-video-ms-1.7b/
 
 # Vim placeholders

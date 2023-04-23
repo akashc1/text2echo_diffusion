@@ -1,22 +1,23 @@
+from glob import glob
+from itertools import islice
+import json
 import os
-import pandas as pd
+import random
+
+from PIL import Image
 import decord
 import numpy as np
-import random
-import json
+import pandas as pd
+import torch
 import torchvision
 from torchvision.transforms import Resize
-import torch
 
-from glob import glob
-from PIL import Image
-from itertools import islice
 from .bucketing import sensible_buckets
 
 decord.bridge.set_bridge('torch')
 
-from torch.utils.data import Dataset
 from einops import rearrange, repeat
+from torch.utils.data import Dataset
 
 
 def get_prompt_ids(prompt, tokenizer):

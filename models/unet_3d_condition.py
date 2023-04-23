@@ -15,15 +15,15 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from diffusers.configuration_utils import ConfigMixin, register_to_config
+from diffusers.models.embeddings import TimestepEmbedding, Timesteps
+from diffusers.models.modeling_utils import ModelMixin
+from diffusers.models.transformer_temporal import TransformerTemporalModel
+from diffusers.utils import BaseOutput, logging
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint
 
-from diffusers.configuration_utils import ConfigMixin, register_to_config
-from diffusers.utils import BaseOutput, logging
-from diffusers.models.embeddings import TimestepEmbedding, Timesteps
-from diffusers.models.modeling_utils import ModelMixin
-from diffusers.models.transformer_temporal import TransformerTemporalModel
 from .unet_3d_blocks import (
     CrossAttnDownBlock3D,
     CrossAttnUpBlock3D,
@@ -32,9 +32,8 @@ from .unet_3d_blocks import (
     UpBlock3D,
     get_down_block,
     get_up_block,
-    transformer_g_c
+    transformer_g_c,
 )
-
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 

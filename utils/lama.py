@@ -19,16 +19,15 @@ import os
 import sys
 from urllib.request import urlretrieve
 
-import torch
-from einops import rearrange
 from PIL import Image
+from einops import rearrange
+import torch
 from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms.functional import to_tensor
 from tqdm import tqdm
 
 from train import export_to_video
-
 
 LAMA_URL = "https://huggingface.co/akhaliq/lama/resolve/main/best.ckpt"
 LAMA_PATH = "models/lama.ckpt"
