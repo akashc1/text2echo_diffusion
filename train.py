@@ -415,15 +415,15 @@ def handle_cache_latents(
     )
 
     # Distributed case: write each rank's output to different path, since indices alone will clash
-    rank = accelerator.process_index
+    rank, world_size = accelerator.process_index, accelerator.num_processes
 
     if cached_latent_dir is None:
         cache_save_dir = Path(output_dir) / 'cached_latents'
-        cache_save_dir.mkdir(exist_ok=True)
+        cache_save_dir.mkdir(exist_ok=True, parents=True)
 
         for i, batch in enumerate(tqdm(train_dataloader, desc="Caching Latents.")):
 
-            full_out_path = cache_save_dir / f'cached_{rank}.{i}.pt'
+            full_out_path = cache_save_dir / f'cached_{rank}_{world_size}.{i}.pt'
             if full_out_path.is_file():
                 print(f"Skipping cached example in {str(full_out_path)}")
                 continue
