@@ -6,6 +6,7 @@ import inspect
 import logging
 import math
 import os
+from pathlib import Path
 import random
 from typing import Dict, Optional, Tuple
 
@@ -141,6 +142,9 @@ def create_output_folders(output_dir, config):
 
 
 def load_primary_models(pretrained_model_path):
+    if not any(substr in pretrained_model_path for substr in ('http',)):
+        assert Path(pretrained_model_path).exists(), f"{pretrained_model_path=} does not exist!"
+
     noise_scheduler = DDPMScheduler.from_pretrained(pretrained_model_path, subfolder="scheduler")
     tokenizer = CLIPTokenizer.from_pretrained(pretrained_model_path, subfolder="tokenizer")
     text_encoder = CLIPTextModel.from_pretrained(pretrained_model_path, subfolder="text_encoder")
@@ -632,7 +636,7 @@ def main(
     # Initialize the optimizer
     optimizer_cls = get_optimizer(use_8bit_adam)
 
-    # Use LoRA if enabled.    
+    # Use LoRA if enabled.
     unet_lora_params, unet_negation = inject_lora(
         use_unet_lora, unet, unet_lora_modules, is_extended=True,
         r=lora_rank, lora_path=lora_path
@@ -685,50 +689,50 @@ def main(
 
     # Process many datasets
     else:
-        train_dataset = torch.utils.data.ConcatDataset(train_datasets) 
+        train_dataset = torch.utils.data.ConcatDataset(train_datasets)
 
     # DataLoaders creation:
     train_dataloader = torch.utils.data.DataLoader(
-        train_dataset, 
+        train_dataset,
         batch_size=train_batch_size,
         shuffle=True
     )
 
-     # Latents caching
+    # Latents caching
     cached_data_loader = handle_cache_latents(
-        cache_latents, 
+        cache_latents,
         output_dir,
-        train_dataloader, 
-        train_batch_size, 
+        train_dataloader,
+        train_batch_size,
         vae,
         cached_latent_dir
-    ) 
+    )
 
-    if cached_data_loader is not None: 
+    if cached_data_loader is not None:
         train_dataloader = cached_data_loader
 
     # Prepare everything with our `accelerator`.
-    unet, optimizer,train_dataloader, lr_scheduler, text_encoder = accelerator.prepare(
-        unet, 
-        optimizer, 
-        train_dataloader, 
-        lr_scheduler, 
+    unet, optimizer, train_dataloader, lr_scheduler, text_encoder = accelerator.prepare(
+        unet,
+        optimizer,
+        train_dataloader,
+        lr_scheduler,
         text_encoder
     )
 
     # Use Gradient Checkpointing if enabled.
     unet_and_text_g_c(
-        unet, 
-        text_encoder, 
-        gradient_checkpointing, 
+        unet,
+        text_encoder,
+        gradient_checkpointing,
         text_encoder_gradient_checkpointing
     )
-    
+
     # Enable VAE slicing to save memory.
     vae.enable_slicing()
 
     # For mixed precision training we cast the text_encoder and vae weights to half-precision
-    # as these models are only used for inference, keeping weights in full precision is not required.
+    # as these models are only used for inference, keeping weights in full precision is not required
     weight_dtype = is_mixed_precision(accelerator)
 
     # Move text encoders, and VAE to GPU

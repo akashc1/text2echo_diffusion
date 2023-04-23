@@ -1,5 +1,5 @@
 # Pretrained diffusers model path.
-pretrained_model_path: "./models/model_scope_diffusers/" #https://huggingface.co/damo-vilab/text-to-video-ms-1.7b/tree/main
+pretrained_model_path: "./models/models_scope_diffusers/" #https://huggingface.co/damo-vilab/text-to-video-ms-1.7b/tree/main
 
 # The folder where your training outputs will be placed.
 output_dir: "./outputs"
