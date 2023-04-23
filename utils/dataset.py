@@ -95,12 +95,12 @@ def process_video(vid_path, use_bucketing, w, h, get_frame_buckets, get_frame_ba
 class VideoLedgerDataset(Dataset):
     def __init__(
         self,
+        ledger_path: str = "/scratch/groups/willhies/echo/echoai/combined.csv",
         tokenizer=None,
         width: int = 256,
         height: int = 256,
         n_sample_frames: int = 16,
         fps: int = 8,
-        ledger_path: str = "/scratch/groups/willhies/echo/echoai/combined.csv",
         fallback_prompt: str = "",
         use_bucketing: bool = False,
         **kwargs
@@ -190,23 +190,22 @@ class VideoLedgerDataset(Dataset):
         }
 
 
-
 # https://github.com/ExponentialML/Video-BLIP2-Preprocessor
 class VideoJsonDataset(Dataset):
     def __init__(
-            self,
-            tokenizer = None,
-            width: int = 256,
-            height: int = 256,
-            n_sample_frames: int = 4,
-            sample_start_idx: int = 1,
-            frame_step: int = 1,
-            json_path: str ="",
-            json_data = None,
-            vid_data_key: str = "video_path",
-            preprocessed: bool = False,
-            use_bucketing: bool = False,
-            **kwargs
+        self,
+        tokenizer,
+        width: int = 256,
+        height: int = 256,
+        n_sample_frames: int = 4,
+        sample_start_idx: int = 1,
+        frame_step: int = 1,
+        json_path: str = "",
+        json_data=None,
+        vid_data_key: str = "video_path",
+        preprocessed: bool = False,
+        use_bucketing: bool = False,
+        **kwargs
     ):
         self.vid_types = (".mp4", ".avi", ".mov", ".webm", ".flv", ".mjpeg")
         self.use_bucketing = use_bucketing
@@ -228,8 +227,8 @@ class VideoJsonDataset(Dataset):
         for data in json_data['data']:
             for nested_data in data['data']:
                 self.build_json_dict(
-                    data, 
-                    nested_data, 
+                    data,
+                    nested_data,
                     extended_data
                 )
         json_data = extended_data
@@ -347,7 +346,8 @@ class VideoJsonDataset(Dataset):
         return video, prompt, prompt_ids
 
     @staticmethod
-    def __getname__(): return 'json'
+    def __getname__():
+        return 'json'
 
     def __len__(self):
         if self.train_data is not None:

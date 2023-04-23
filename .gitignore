@@ -1,4 +1,4 @@
-output/
+outputs/
 models/lama.ckpt
 .vscode/
 models/model_scope_diffusers/
