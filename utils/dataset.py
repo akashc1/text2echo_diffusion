@@ -1,10 +1,11 @@
 import os
+import pandas as pd
 import decord
 import numpy as np
 import random
 import json
 import torchvision
-import torchvision.transforms as T
+from torchvision.transforms import Resize
 import torch
 
 from glob import glob
@@ -99,7 +100,7 @@ class VideoLedgerDataset(Dataset):
         height: int = 256,
         n_sample_frames: int = 16,
         fps: int = 8,
-        ledger_path: str = "./data",
+        ledger_path: str = "/scratch/groups/willhies/echo/echoai/combined.csv",
         fallback_prompt: str = "",
         use_bucketing: bool = False,
         **kwargs
@@ -109,7 +110,8 @@ class VideoLedgerDataset(Dataset):
 
         self.fallback_prompt = fallback_prompt
 
-        self.video_files = glob(f"{path}/*.mp4")
+        self.ledger_path = ledger_path
+        self.ledger = pd.read_csv(ledger_path)
 
         self.width = width
         self.height = height
@@ -120,7 +122,7 @@ class VideoLedgerDataset(Dataset):
     def get_frame_buckets(self, vr):
         _, h, w = vr[0].shape
         width, height = sensible_buckets(self.width, self.height, h, w)
-        resize = T.transforms.Resize((height, width), antialias=True)
+        resize = Resize((height, width), antialias=True)
 
         return resize
 
@@ -147,13 +149,13 @@ class VideoLedgerDataset(Dataset):
 
     def process_video_wrapper(self, vid_path):
         video, vr = process_video(
-                vid_path,
-                self.use_bucketing,
-                self.width,
-                self.height,
-                self.get_frame_buckets,
-                self.get_frame_batch
-            )
+            vid_path,
+            self.use_bucketing,
+            self.width,
+            self.height,
+            self.get_frame_buckets,
+            self.get_frame_batch
+        )
         return video, vr
 
     def get_prompt_ids(self, prompt):
@@ -167,21 +169,17 @@ class VideoLedgerDataset(Dataset):
 
     @staticmethod
     def __getname__():
-        return 'folder'
+        return 'ledger'
 
     def __len__(self):
-        return len(self.video_files)
+        return self.ledger.shape[0]
 
     def __getitem__(self, index):
 
-        video, _ = self.process_video_wrapper(self.video_files[index])
+        meta_row = self.ledger.iloc[index]
+        video, _ = self.process_video_wrapper(meta_row['avi_path'])
 
-        if os.path.exists(self.video_files[index].replace(".mp4", ".txt")):
-            with open(self.video_files[index].replace(".mp4", ".txt"), "r") as f:
-                prompt = f.read()
-        else:
-            prompt = self.fallback_prompt
-
+        prompt = meta_row.get('report', self.fallback_prompt)
         prompt_ids = self.get_prompt_ids(prompt)
 
         return {
